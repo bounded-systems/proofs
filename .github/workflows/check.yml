@@ -16,7 +16,9 @@ jobs:
             | sh -s -- -y --default-toolchain leanprover/lean4:v4.32.2
           echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
       - name: Check proofs
-        run: lean lease/LeaseTier.lean
+        run: |
+          lean lease/LeaseTier.lean
+          lean ci-state/CiState.lean
 
   tlc:
     name: TLC model checking
@@ -47,3 +49,19 @@ jobs:
             exit 1
           fi
           grep -q "Invariant AttackerNeverHolds is violated" tlc-misconfig.log
+      - name: Coherent CI observations — confluence holds over every order
+        working-directory: ci-state
+        run: java -cp ../tla2tools.jar tlc2.TLC -workers auto -config MCCiState.cfg MCCiState.tla
+      - name: Reused run id — the order-dependence must still be found
+        working-directory: ci-state
+        run: |
+          set +e
+          java -cp ../tla2tools.jar tlc2.TLC -workers auto \
+            -config MCCiStateIncoherent.cfg MCCiStateIncoherent.tla | tee tlc-incoherent.log
+          code=${PIPESTATUS[0]}
+          set -e
+          if [ "$code" -ne 12 ]; then
+            echo "Expected TLC exit 12 (invariant violated), got $code" >&2
+            exit 1
+          fi
+          grep -q "Invariant Confluent is violated" tlc-incoherent.log
