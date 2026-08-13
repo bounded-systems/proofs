@@ -53,6 +53,33 @@ Both checkers run in CI on every push — see
 model is asserted to *fail* (exit 12, counterexample found); a green build
 means the attack is still found, which is the assertion that matters.
 
+## The second system: the fleet CI aggregator's reducer
+
+[`ci-state/`](./ci-state) applies the same method to a live system —
+`bounded-systems/bounded.tools` → `src/ci-state.ts`, the reducer behind the
+fleet CI aggregator (`.github-private#481`). GitHub `workflow_run` webhooks
+arrive unordered and a reconcile poll replays history; the code's whole
+answer is "newest-runId-wins makes that safe":
+
+| | TLA+ ([`CiState.tla`](./ci-state/CiState.tla)) | Lean ([`CiState.lean`](./ci-state/CiState.lean)) |
+|---|---|---|
+| Delivery order cannot change the answer | `Confluent`, checked over every order incl. redelivery | `applyAll_perm`, proved ∀ |
+| Replaying already-delivered history is a no-op | same invariant survives redelivery steps | `applyAll_replay` (needs **no** coherence) |
+| **A reused run id defeats a correct reducer** | **found**: TLC emits the order-dependence trace | **constructed**: `incoherent_not_confluent` |
+
+The last row is this system's misconfig twin, and it carries the same lesson:
+confluence rests on a **named hypothesis** — `(key, runId)` identifies one
+observation — which is a fact about *GitHub* (run ids are unique), not about
+the code. Drop it and both checkers show the fold is order-dependent while
+every line of the reducer stays "correct". The middle rung for this system
+lives with the code: `bounded.tools`' property tests run the same claims
+against the shipped TypeScript on every push.
+
+Its stated discharge obligations: **lost updates** (confluence covers
+reordering, not racing read-modify-writes — that is the Durable Object's
+serialization, `src/ci-do.ts`), adapter policy, and the run-id-uniqueness
+hypothesis itself.
+
 ## Running locally
 
 ```sh
