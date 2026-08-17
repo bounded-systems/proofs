@@ -1,5 +1,3 @@
-{"message":"Not Found","documentation_url":"https://docs.github.com/rest/repos/contents#get-repository-content","status":"404"}
-
 <!-- bounded-systems-org:begin — managed by adopt-claude-harness; do not hand-edit this block -->
 ## bounded-systems sessions — before anything else
 
